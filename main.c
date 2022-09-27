@@ -7,7 +7,7 @@
 #define WRITE 1
 #define READ 0
 
-int N;
+#define N 5
 
 void close_all(int pipes[], int n) {
     for (int i = 0; i < n; ++i) {
@@ -21,7 +21,7 @@ void pipe_all(int pipes[], int num_pipes) {
     }
 }
 
-int pid = 0;
+pid_t pid = 0;
 
 /*
 child 2 -> 0
@@ -33,8 +33,6 @@ child 5 -> 6
 void fork_child(char** cmds[], int pipes[], int child) {
     int reads[] = {NULL, NULL, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30};
     int writes[] = {NULL, NULL, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33};
-    
-
     pid = fork();
     if (pid == 0)
 	{
@@ -49,11 +47,26 @@ void fork_child(char** cmds[], int pipes[], int child) {
 
 	  close_all(pipes, N * 2);
 
-	  execvp(*cmds[child], cmds[child]);
-	} else {
-        if (child < N) {
+	  execvp(cmds[child][0], cmds[child]);
+	} else if (pid < 0) {
+        printf("error");
+    } else {
+        if (child < N - 1) {
             fork_child(cmds, pipes, child + 1);
-        } 
+        } else {
+            if (fork() == 0)
+	    {
+	      // replace cut's stdin with input read of 2nd pipe
+
+	      dup2(pipes[reads[N]], 0);
+
+	      // close all ends of pipes
+
+	      close_all(pipes, N * 2);
+
+	      execvp(cmds[child][0], cmds[child]);
+	    }
+        }
     }
 }
 
@@ -73,13 +86,14 @@ int main(int argc, char **argv)
   // arguments for commands; your parser would be responsible for
   // setting up arrays like these
 
-  char *cat_args[] = {"ls", NULL};
-  char *grep_args[] = {"wc", NULL};
-  char *ls[] = {"ls", NULL};
-  //char *cut_args[] = {"wc", NULL};
-  char** arr[] = {cat_args, grep_args, ls, NULL};
 
-  N = 3;
+  char *cat_args[] = {"ls", NULL};
+  char *grep_args[] = {"ls", NULL};
+  char *ls[] = {"grep", "o", NULL};
+  char *cut_args[] = {"grep", "p", NULL};
+  char *test[] = {"grep", "m", NULL};
+  char *test2[] = {"wc", NULL};
+  char* arr[][N + 1] = {cat_args, grep_args, ls, cut_args, test, test, NULL};
 
   int pipes[(2 * (N - 1))];
   pipe_all(pipes, N - 1);
@@ -114,7 +128,7 @@ int main(int argc, char **argv)
     {
         fork_child(arr, pipes, 2);
 
-        
+
         /*
     for (int child = 2; child < N; ++child) {
         fork_child(arr[child - 1], pipes, child);
